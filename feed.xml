@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2016-12-27T17:30:32-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
+</subtitle><entry><title type="html">Hello World!</title><link href="/x86/assembly/shellcode/2016/12/27/hello-world.html" rel="alternate" type="text/html" title="Hello World!" /><published>2016-12-27T00:00:00-08:00</published><updated>2016-12-27T00:00:00-08:00</updated><id>/x86/assembly/shellcode/2016/12/27/hello-world</id><content type="html" xml:base="/x86/assembly/shellcode/2016/12/27/hello-world.html">&lt;p&gt;Hello World!&lt;/p&gt;
+
+&lt;p&gt;This is, perhaps obviously, a starting post.  So I’ve opted to start with something reasonably fun:
+a breakdown of how to write &amp;amp; test a piece of ‘hello world’ shellcode assembly targetting Linux.&lt;br /&gt;
+We’ll start with a simple assembly program which prints output using interrupts to trigger system calls, 
+move to compiling just part of that function, dumping it as hex, and calling it from C, and then use
+a couple of tricks to remove the nulls from it–which will allow it to be used as shellcode.  These tricks 
+are useful for ‘classic’ buffer overflow attacks (which I’ll likely dig into at some later date).&lt;/p&gt;
+
+&lt;p&gt;I opted to go with x86-32 bit assembly (since it’s what I know well off the top of my head).  Perhaps someday I’ll
+revisit this post but use 64 bit assembly.&lt;/p&gt;
+
+&lt;p&gt;The code samples here are going to be available on my github page &lt;a href=&quot;https://github.com/evmaus&quot;&gt;here&lt;/a&gt;.  If you want to follow along,
+you’ll need to install the GCC and GAS to compile the samples, and if you’re on a 64 bit x86 system configure your system
+for multilib.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;c&quot;&gt;# For multilib, since I wrote this on an x86_64 machine:&lt;/span&gt;
+&lt;span class=&quot;nv&quot;&gt;$dpkg&lt;/span&gt; --add-architecture i386
+&lt;span class=&quot;nv&quot;&gt;$apt&lt;/span&gt;-get install build-essentials gcc-multilib libstdc++6:i386&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;h2 id=&quot;getting-started&quot;&gt;Getting Started&lt;/h2&gt;
+
+&lt;p&gt;First, we’ll start with a basic “Hello World”-esque assembly program.  We’ll be using the GNU assembler syntax.
+This illustrates how to make system calls using int 0x80 on linux–something we’ll use more later.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-assembly&quot; data-lang=&quot;assembly&quot;&gt;# Declare the 'main' function for the linker.
+.global main
+
+# Declare the local variables--a 'Hello Reader' string,
+# and the length of that string.
+.data
+HelloMsg:
+    .ascii &quot;Hello Reader!\n&quot;  
+.set len, .-HelloMsg
+
+.text
+main:
+    #Print Hello Msg
+    movl $0x4, %eax # Syscall Id for &quot;Write&quot;
+    movl $0x1, %ebx # File Descriptor for stdout
+    movl $HelloMsg, %ecx # Address of &quot;HelloMsg&quot;
+    movl $len, %edx # Length of &quot;HelloMsg&quot;
+    int $0x80
+    
+    #Exit the program.
+    mov $0x1, %eax # Syscall id for Exit
+    mov $0x0, %ebx # Exit code = 0
+    int $0x80
+    &lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;We’re using the instruction int 0x80 to make syscalls here–this basically tells the processor to go to the kernel
+and call a function with a set of parameters–in particular, the EAX register controls which syscall number
+you want to use (the two we’re using are &lt;a href=&quot;http://man7.org/linux/man-pages/man2/write.2.html&quot;&gt;Write&lt;/a&gt;, which is 0x4, and &lt;a href=&quot;http://man7.org/linux/man-pages/man2/_exit.2.html&quot;&gt;Exit&lt;/a&gt;, which is 0x1), and the rest of the 
+registers control what parameters are passed to the function (in order:  EBX, ECX, EDX, ESI, EDI, EBP).  The
+full list of syscalls is available in the &lt;a href=&quot;https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_32.tbl&quot;&gt;linux kernel&lt;/a&gt;.  The parameters are documented in man pages,
+but they’re basically the standard POSIX calls–in general, you can access them via a man call like:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$man&lt;/span&gt; 2 write&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;You should be able to compile and run the above with:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$gcc&lt;/span&gt; basic-hello-world.s -m32 -o Hello-Reader
+&lt;span class=&quot;nv&quot;&gt;$.&lt;/span&gt;/Hello-Reader
+Hello Reader!&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;h2 id=&quot;calling-this-from-c&quot;&gt;Calling this from C&lt;/h2&gt;
+
+&lt;p&gt;The above program is compiled to a full executable–if you run “objdump -t Hello-Reader” you’ll get a whole bunch of symbols,
+and on my system it compiled down to a 4832 byte file.  If we’re going to do a classic buffer overflow attack, we’re likely 
+pushing our shellcode into input somewhere, and don’t need the full executable file to do that.&lt;/p&gt;
+
+&lt;p&gt;So in order to just get down to the core of our assembly program, we’ll create two files–first, an assembly file containing
+the code we wish to execute, and second a C wrapper that contains the hexadecimal representation of just the assembly we’re
+calling into.&lt;/p&gt;
+
+&lt;p&gt;First, the assembly function:  we’ll start with just a simple assembly function which wraps our syscall to
+“write” in a function that takes two arguments and passes them along.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-assembly&quot; data-lang=&quot;assembly&quot;&gt;.text
+write_call:
+    # Start the function--store the stack frame and save ebx,
+    # as ebx is a callee saved register.
+    pushl %ebp
+    movl %esp, %ebp
+    pushl %ebx 
+    
+    movl $0x4, %eax # Syscall Id for &quot;Write&quot;
+    movl $0x1, %ebx # File Descriptor for stdout
+    movl 8(%ebp), %ecx # Address of &quot;HelloMsg&quot;
+    movl 12(%ebp), %edx # Length of &quot;HelloMsg&quot;
+    int $0x80
+
+    #End the function--restore the stack frame and ebx
+    # before returning to the caller.
+    popl %ebx # restore ebx
+    popl %ebp
+    ret&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;We can compile this to just object code (which is essentially just the compiled code for this function) using ‘as’ 
+(with the –32 flag so that it’s 32 bit), and then we can dump the machine code of this function using objdump.  It 
+should be similar to:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$as&lt;/span&gt; asm-function.s -o asm-function.o --32
+&lt;span class=&quot;nv&quot;&gt;$objdump&lt;/span&gt; -d asm-function.o
+
+asm-function.o:     file format elf32-i386
+
+Disassembly of section .text:
+
+00000000 &amp;lt;write_call&amp;gt;:
+   0:   55                      push   %ebp
+   1:   89 e5                   mov    %esp,%ebp
+   3:   53                      push   %ebx
+   4:   b8 04 00 00 00          mov    &lt;span class=&quot;nv&quot;&gt;$0x4&lt;/span&gt;,%eax
+   9:   bb 01 00 00 00          mov    &lt;span class=&quot;nv&quot;&gt;$0x1&lt;/span&gt;,%ebx
+   e:   8b 4d 08                mov    0x8&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%ebp&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;,%ecx
+  11:   8b 55 0c                mov    0xc&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%ebp&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;,%edx
+  14:   &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;80                   int    &lt;span class=&quot;nv&quot;&gt;$0x80&lt;/span&gt;
+  16:   5b                      pop    %ebx
+  17:   5d                      pop    %ebp
+  18:   c3                      ret&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Then we can call that machine code from a simple C-wrapper, by dumping it into a C-style string,
+populating an executable buffer with the hex, and calling the function with the appropriate arguments.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;cp&quot;&gt;#include &amp;lt;string.h&amp;gt;
+#include &amp;lt;sys/mman.h&amp;gt;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;char&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x55\x89\xe5\x53\xb8\x04\x00\x00\x00\xbb\x01\x00\x00\x00\x8b\x4d\x08\x8b\x55\x0c\xcd\x80\x5b\x5d\xc3&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;kt&quot;&gt;char&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;msg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&quot;Hello Reader!&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\n&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;main&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// mmap a executable memory block and copy our code into it.
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;mmap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;sizeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;PROT_EXEC&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;PROT_READ&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;PROT_WRITE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MAP_ANONYMOUS&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MAP_PRIVATE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;memcpy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;sizeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;));&lt;/span&gt;
+    
+    &lt;span class=&quot;c1&quot;&gt;// Call our code as a function that takes a pointer and an integer, 
+&lt;/span&gt;    &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;char&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;msg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;sizeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;msg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;));&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This can be compiled with&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$gcc&lt;/span&gt; asm-function-c-wrapper.c -m32 -o c-wrapper
+&lt;span class=&quot;nv&quot;&gt;$.&lt;/span&gt;/c-wrapper
+Hello Reader!&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;If you want to dig more into what this is doing, you can compile it with the -g flag and step through it with gdb.
+Once you get into the call into our code, some useful commands are “si”, which steps a single assembly instruction,
+and “x/10i $eip”, which disassembles the next 10 instructions after the instruction pointer.&lt;/p&gt;
+
+&lt;h2 id=&quot;removing-nulls&quot;&gt;Removing Nulls&lt;/h2&gt;
+
+&lt;p&gt;Now that we can limit our code to a simple C function, we should look more closely at the hexadecimal we’re using.
+In many buffer overflow attacks, we’re providing input to an unsafe function like strcpy or gets, which terminates
+on nulls–so it’s going to be handy to avoid null characters.  Unfortunately, we’ve got several in that function we’ve
+constructed above.  However, we can get rid of all of them with a fairly simple trick:  instead of “movl $0x1, %ebx”, 
+which winds up expanding out to “movl $0x00000001, %ebx” (since we’re moving 4 bytes into a 4 byte register), 
+we’ll zero the register and then just access the lowest order byte like so:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-assembly&quot; data-lang=&quot;assembly&quot;&gt;# this is equivalent to movl $0x1, %ebx
+xor %ebx, %ebx # zero out ebx
+movb $0x1, %bl # move a byte into the lowest byte of %ebx.&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Note that we can’t make assumptions about the upper bytes of EBX, so we have to ensure it’s zeroed first.&lt;/p&gt;
+
+&lt;p&gt;We’re also going to add another nuance to make this a little more realistic–we’d like to print our message 
+without passing any parameters into the assembly, since in general you can’t assume you’ll be able to do 
+that during exploitation.  However, if we’re including our message in the assembly we’re writing, and 
+then copying that assembly to memory that we allocated with mmap, we won’t necessarily know what address 
+the string is at, which is a parameter to &lt;strong&gt;write()&lt;/strong&gt;.  (This is generally the case when writing shellcode 
+intended for exploitation–you don’t always necessarily know what address your code is going to end up in.)&lt;/p&gt;
+
+&lt;p&gt;To get around that problem, we’ll use a nuance of how “call” works–for short distances, call uses relative addressing (which
+allows us to get around not knowing the address we’re in), and call pushes the address of the ‘next instruction’ to the stack.
+We can then pull that address off the stack and use it.&lt;/p&gt;
+
+&lt;p&gt;That gives us this assembly:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-assembly&quot; data-lang=&quot;assembly&quot;&gt;.text
+write_call:
+    jmp tail
+head:
+    # This is a null-free &quot;movl $0x4, %eax&quot;
+    xor %eax,%eax
+    movb $0x4, %al
+    # This is &quot;movl $0x1, %ebx&quot;
+    xor %ebx, %ebx
+    movb $0x1, %bl
+    # Get the address of the .ascii section below
+    # it was pushed to the stack by the &quot;call&quot; below.
+    popl %ecx
+    # &quot;movl $0x12, %edx -- the length of &quot;Hello Shellcoder!\n&quot;
+    xor %edx, %edx
+    movb $0x12, %dl
+    # Syscall
+    int $0x80
+    
+    # And we'll exit, because we've smashed EBX, which we'd because
+    # required to save if we wanted to use the standard calling convention.
+    xor %eax,%eax
+    movb $0x1, %al
+    xor %ebx,%ebx
+    int $0x80
+tail:
+    call head
+    .ascii &quot;Hello Shellcoder!\n&quot;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;As before, we can compile this and dump the hexadecimal:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$as&lt;/span&gt; null-free-write.s --32 -o null-free-write.o
+&lt;span class=&quot;nv&quot;&gt;$objdump&lt;/span&gt; -D null-free-write.o
+
+null-free-write.o:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+00000000 &amp;lt;write_call&amp;gt;:
+   0:   eb 17                   jmp    19 &amp;lt;tail&amp;gt;
+
+00000002 &amp;lt;head&amp;gt;:
+   2:   31 c0                   xor    %eax,%eax
+   4:   b0 04                   mov    &lt;span class=&quot;nv&quot;&gt;$0x4&lt;/span&gt;,%al
+   6:   31 db                   xor    %ebx,%ebx
+   8:   b3 01                   mov    &lt;span class=&quot;nv&quot;&gt;$0x1&lt;/span&gt;,%bl
+
+   a:   59                      pop    %ecx
+   b:   31 d2                   xor    %edx,%edx
+   d:   b2 12                   mov    &lt;span class=&quot;nv&quot;&gt;$0x12&lt;/span&gt;,%dl
+   f:   &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;80                   int    &lt;span class=&quot;nv&quot;&gt;$0x80&lt;/span&gt;
+  11:   31 c0                   xor    %eax,%eax
+  13:   b0 01                   mov    &lt;span class=&quot;nv&quot;&gt;$0x1&lt;/span&gt;,%al
+  15:   31 db                   xor    %ebx,%ebx
+  17:   &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;80                   int    &lt;span class=&quot;nv&quot;&gt;$0x80&lt;/span&gt;
+
+00000019 &amp;lt;tail&amp;gt;:
+  19:   e8 e4 ff ff ff          call   2 &amp;lt;head&amp;gt;
+  1e:   48                      dec    %eax
+  1f:   65 6c                   gs insb &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%dx&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;,%es:&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%edi&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+  21:   6c                      insb   &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%dx&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;,%es:&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%edi&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+  22:   6f                      outsl  %ds:&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%esi&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;,&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%dx&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+  23:   20 53 68                and    %dl,0x68&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%ebx&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+  26:   65 6c                   gs insb &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%dx&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;,%es:&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%edi&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+  28:   6c                      insb   &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%dx&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;,%es:&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%edi&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+  29:   63 6f 64                arpl   %bp,0x64&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;%edi&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+  2c:   65 72 21                gs jb  50 &amp;lt;tail+0x37&amp;gt;
+  2f:   0a                      .byte 0xa&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;And we can drop that into a slightly modified C wrapper (we remove the arguments we passed to the previous iteration of this):&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;cp&quot;&gt;#include &amp;lt;string.h&amp;gt;
+#include &amp;lt;sys/mman.h&amp;gt;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;char&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\xeb\x17\x31\xc0\xb0\x04\x31\xdb\xb3\x01\x59\x31\xd2\xb2\x12\xcd\x80\x31\xc0\xb0\x01\x31\xdb\xcd\x80\xe8\xe4\xff\xff\xff\x48\x65\x6c\x6c\x6f\x20\x53\x68\x65\x6c\x6c\x63\x6f\x64\x65\x72\x21\x0a&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;main&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// mmap a executable memory block and copy code into it.
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;mmap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;sizeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;PROT_EXEC&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;PROT_READ&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;PROT_WRITE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MAP_ANONYMOUS&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MAP_PRIVATE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;memcpy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;sizeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;));&lt;/span&gt;
+    
+    &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)();&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Which we can compile and run in a similar way:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;gcc shellcode-c-wrapper.c -m32
+&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;./a.out
+Hello Shellcoder!&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Hope this was educational/helpful!&lt;/p&gt;</content><summary type="html">Hello World!</summary></entry></feed>

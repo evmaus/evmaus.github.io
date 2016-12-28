@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Hello World!</title>
+  <meta name="description" content="Hello World!">
+
+  <link rel="stylesheet" href="/assets/main.css">
+  <link rel="canonical" href="/x86/assembly/shellcode/2016/12/27/hello-world.html">
+  <link rel="alternate" type="application/rss+xml" title="System E" href="/feed.xml">
+  
+  
+</head>
+
+
+  <body>
+
+    <header class="site-header" role="banner">
+
+  <div class="wrapper">
+
+    <a class="site-title" href="/">System E</a>
+
+    <nav class="site-nav">
+      <span class="menu-icon">
+        <svg viewBox="0 0 18 15" width="18px" height="15px">
+          <path fill="#424242" d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z"/>
+          <path fill="#424242" d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z"/>
+          <path fill="#424242" d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z"/>
+        </svg>
+      </span>
+
+      <div class="trigger">
+        
+          
+          <a class="page-link" href="/about/">About</a>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </div>
+    </nav>
+
+  </div>
+
+</header>
+
+
+    <main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title" itemprop="name headline">Hello World!</h1>
+    <p class="post-meta"><time datetime="2016-12-27T00:00:00-08:00" itemprop="datePublished">Dec 27, 2016</time></p>
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    <p>Hello World!</p>
+
+<p>This is, perhaps obviously, a starting post.  So I’ve opted to start with something reasonably fun:
+a breakdown of how to write &amp; test a piece of ‘hello world’ shellcode assembly targetting Linux.<br />
+We’ll start with a simple assembly program which prints output using interrupts to trigger system calls, 
+move to compiling just part of that function, dumping it as hex, and calling it from C, and then use
+a couple of tricks to remove the nulls from it–which will allow it to be used as shellcode.  These tricks 
+are useful for ‘classic’ buffer overflow attacks (which I’ll likely dig into at some later date).</p>
+
+<p>I opted to go with x86-32 bit assembly (since it’s what I know well off the top of my head).  Perhaps someday I’ll
+revisit this post but use 64 bit assembly.</p>
+
+<p>The code samples here are going to be available on my github page <a href="https://github.com/evmaus">here</a>.  If you want to follow along,
+you’ll need to install the GCC and GAS to compile the samples, and if you’re on a 64 bit x86 system configure your system
+for multilib.</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c"># For multilib, since I wrote this on an x86_64 machine:</span>
+<span class="nv">$dpkg</span> --add-architecture i386
+<span class="nv">$apt</span>-get install build-essentials gcc-multilib libstdc++6:i386</code></pre></figure>
+
+<h2 id="getting-started">Getting Started</h2>
+
+<p>First, we’ll start with a basic “Hello World”-esque assembly program.  We’ll be using the GNU assembler syntax.
+This illustrates how to make system calls using int 0x80 on linux–something we’ll use more later.</p>
+
+<figure class="highlight"><pre><code class="language-assembly" data-lang="assembly"># Declare the 'main' function for the linker.
+.global main
+
+# Declare the local variables--a 'Hello Reader' string,
+# and the length of that string.
+.data
+HelloMsg:
+    .ascii "Hello Reader!\n"  
+.set len, .-HelloMsg
+
+.text
+main:
+    #Print Hello Msg
+    movl $0x4, %eax # Syscall Id for "Write"
+    movl $0x1, %ebx # File Descriptor for stdout
+    movl $HelloMsg, %ecx # Address of "HelloMsg"
+    movl $len, %edx # Length of "HelloMsg"
+    int $0x80
+    
+    #Exit the program.
+    mov $0x1, %eax # Syscall id for Exit
+    mov $0x0, %ebx # Exit code = 0
+    int $0x80
+    </code></pre></figure>
+
+<p>We’re using the instruction int 0x80 to make syscalls here–this basically tells the processor to go to the kernel
+and call a function with a set of parameters–in particular, the EAX register controls which syscall number
+you want to use (the two we’re using are <a href="http://man7.org/linux/man-pages/man2/write.2.html">Write</a>, which is 0x4, and <a href="http://man7.org/linux/man-pages/man2/_exit.2.html">Exit</a>, which is 0x1), and the rest of the 
+registers control what parameters are passed to the function (in order:  EBX, ECX, EDX, ESI, EDI, EBP).  The
+full list of syscalls is available in the <a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_32.tbl">linux kernel</a>.  The parameters are documented in man pages,
+but they’re basically the standard POSIX calls–in general, you can access them via a man call like:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$man</span> 2 write</code></pre></figure>
+
+<p>You should be able to compile and run the above with:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$gcc</span> basic-hello-world.s -m32 -o Hello-Reader
+<span class="nv">$.</span>/Hello-Reader
+Hello Reader!</code></pre></figure>
+
+<h2 id="calling-this-from-c">Calling this from C</h2>
+
+<p>The above program is compiled to a full executable–if you run “objdump -t Hello-Reader” you’ll get a whole bunch of symbols,
+and on my system it compiled down to a 4832 byte file.  If we’re going to do a classic buffer overflow attack, we’re likely 
+pushing our shellcode into input somewhere, and don’t need the full executable file to do that.</p>
+
+<p>So in order to just get down to the core of our assembly program, we’ll create two files–first, an assembly file containing
+the code we wish to execute, and second a C wrapper that contains the hexadecimal representation of just the assembly we’re
+calling into.</p>
+
+<p>First, the assembly function:  we’ll start with just a simple assembly function which wraps our syscall to
+“write” in a function that takes two arguments and passes them along.</p>
+
+<figure class="highlight"><pre><code class="language-assembly" data-lang="assembly">.text
+write_call:
+    # Start the function--store the stack frame and save ebx,
+    # as ebx is a callee saved register.
+    pushl %ebp
+    movl %esp, %ebp
+    pushl %ebx 
+    
+    movl $0x4, %eax # Syscall Id for "Write"
+    movl $0x1, %ebx # File Descriptor for stdout
+    movl 8(%ebp), %ecx # Address of "HelloMsg"
+    movl 12(%ebp), %edx # Length of "HelloMsg"
+    int $0x80
+
+    #End the function--restore the stack frame and ebx
+    # before returning to the caller.
+    popl %ebx # restore ebx
+    popl %ebp
+    ret</code></pre></figure>
+
+<p>We can compile this to just object code (which is essentially just the compiled code for this function) using ‘as’ 
+(with the –32 flag so that it’s 32 bit), and then we can dump the machine code of this function using objdump.  It 
+should be similar to:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$as</span> asm-function.s -o asm-function.o --32
+<span class="nv">$objdump</span> -d asm-function.o
+
+asm-function.o:     file format elf32-i386
+
+Disassembly of section .text:
+
+00000000 &lt;write_call&gt;:
+   0:   55                      push   %ebp
+   1:   89 e5                   mov    %esp,%ebp
+   3:   53                      push   %ebx
+   4:   b8 04 00 00 00          mov    <span class="nv">$0x4</span>,%eax
+   9:   bb 01 00 00 00          mov    <span class="nv">$0x1</span>,%ebx
+   e:   8b 4d 08                mov    0x8<span class="o">(</span>%ebp<span class="o">)</span>,%ecx
+  11:   8b 55 0c                mov    0xc<span class="o">(</span>%ebp<span class="o">)</span>,%edx
+  14:   <span class="nb">cd </span>80                   int    <span class="nv">$0x80</span>
+  16:   5b                      pop    %ebx
+  17:   5d                      pop    %ebp
+  18:   c3                      ret</code></pre></figure>
+
+<p>Then we can call that machine code from a simple C-wrapper, by dumping it into a C-style string,
+populating an executable buffer with the hex, and calling the function with the appropriate arguments.</p>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c"><span class="cp">#include &lt;string.h&gt;
+#include &lt;sys/mman.h&gt;
+</span>
+<span class="kt">char</span> <span class="n">code</span><span class="p">[]</span> <span class="o">=</span> <span class="s">"</span><span class="se">\x55\x89\xe5\x53\xb8\x04\x00\x00\x00\xbb\x01\x00\x00\x00\x8b\x4d\x08\x8b\x55\x0c\xcd\x80\x5b\x5d\xc3</span><span class="s">"</span><span class="p">;</span>
+
+<span class="kt">char</span> <span class="n">msg</span><span class="p">[]</span> <span class="o">=</span> <span class="s">"Hello Reader!</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="n">main</span><span class="p">(){</span>
+    <span class="kt">void</span> <span class="o">*</span> <span class="n">buf</span><span class="p">;</span>
+
+    <span class="c1">// mmap a executable memory block and copy our code into it.
+</span>    <span class="n">buf</span> <span class="o">=</span> <span class="n">mmap</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">code</span><span class="p">),</span> <span class="n">PROT_EXEC</span> <span class="o">|</span> <span class="n">PROT_READ</span> <span class="o">|</span> <span class="n">PROT_WRITE</span><span class="p">,</span> <span class="n">MAP_ANONYMOUS</span> <span class="o">|</span> <span class="n">MAP_PRIVATE</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">memcpy</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span> <span class="n">code</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">code</span><span class="p">));</span>
+    
+    <span class="c1">// Call our code as a function that takes a pointer and an integer, 
+</span>    <span class="p">((</span><span class="kt">void</span> <span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">,</span> <span class="kt">int</span><span class="p">))</span><span class="n">buf</span><span class="p">)(</span><span class="n">msg</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">msg</span><span class="p">));</span>
+
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>This can be compiled with</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$gcc</span> asm-function-c-wrapper.c -m32 -o c-wrapper
+<span class="nv">$.</span>/c-wrapper
+Hello Reader!</code></pre></figure>
+
+<p>If you want to dig more into what this is doing, you can compile it with the -g flag and step through it with gdb.
+Once you get into the call into our code, some useful commands are “si”, which steps a single assembly instruction,
+and “x/10i $eip”, which disassembles the next 10 instructions after the instruction pointer.</p>
+
+<h2 id="removing-nulls">Removing Nulls</h2>
+
+<p>Now that we can limit our code to a simple C function, we should look more closely at the hexadecimal we’re using.
+In many buffer overflow attacks, we’re providing input to an unsafe function like strcpy or gets, which terminates
+on nulls–so it’s going to be handy to avoid null characters.  Unfortunately, we’ve got several in that function we’ve
+constructed above.  However, we can get rid of all of them with a fairly simple trick:  instead of “movl $0x1, %ebx”, 
+which winds up expanding out to “movl $0x00000001, %ebx” (since we’re moving 4 bytes into a 4 byte register), 
+we’ll zero the register and then just access the lowest order byte like so:</p>
+
+<figure class="highlight"><pre><code class="language-assembly" data-lang="assembly"># this is equivalent to movl $0x1, %ebx
+xor %ebx, %ebx # zero out ebx
+movb $0x1, %bl # move a byte into the lowest byte of %ebx.</code></pre></figure>
+
+<p>Note that we can’t make assumptions about the upper bytes of EBX, so we have to ensure it’s zeroed first.</p>
+
+<p>We’re also going to add another nuance to make this a little more realistic–we’d like to print our message 
+without passing any parameters into the assembly, since in general you can’t assume you’ll be able to do 
+that during exploitation.  However, if we’re including our message in the assembly we’re writing, and 
+then copying that assembly to memory that we allocated with mmap, we won’t necessarily know what address 
+the string is at, which is a parameter to <strong>write()</strong>.  (This is generally the case when writing shellcode 
+intended for exploitation–you don’t always necessarily know what address your code is going to end up in.)</p>
+
+<p>To get around that problem, we’ll use a nuance of how “call” works–for short distances, call uses relative addressing (which
+allows us to get around not knowing the address we’re in), and call pushes the address of the ‘next instruction’ to the stack.
+We can then pull that address off the stack and use it.</p>
+
+<p>That gives us this assembly:</p>
+
+<figure class="highlight"><pre><code class="language-assembly" data-lang="assembly">.text
+write_call:
+    jmp tail
+head:
+    # This is a null-free "movl $0x4, %eax"
+    xor %eax,%eax
+    movb $0x4, %al
+    # This is "movl $0x1, %ebx"
+    xor %ebx, %ebx
+    movb $0x1, %bl
+    # Get the address of the .ascii section below
+    # it was pushed to the stack by the "call" below.
+    popl %ecx
+    # "movl $0x12, %edx -- the length of "Hello Shellcoder!\n"
+    xor %edx, %edx
+    movb $0x12, %dl
+    # Syscall
+    int $0x80
+    
+    # And we'll exit, because we've smashed EBX, which we'd because
+    # required to save if we wanted to use the standard calling convention.
+    xor %eax,%eax
+    movb $0x1, %al
+    xor %ebx,%ebx
+    int $0x80
+tail:
+    call head
+    .ascii "Hello Shellcoder!\n"</code></pre></figure>
+
+<p>As before, we can compile this and dump the hexadecimal:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$as</span> null-free-write.s --32 -o null-free-write.o
+<span class="nv">$objdump</span> -D null-free-write.o
+
+null-free-write.o:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+00000000 &lt;write_call&gt;:
+   0:   eb 17                   jmp    19 &lt;tail&gt;
+
+00000002 &lt;head&gt;:
+   2:   31 c0                   xor    %eax,%eax
+   4:   b0 04                   mov    <span class="nv">$0x4</span>,%al
+   6:   31 db                   xor    %ebx,%ebx
+   8:   b3 01                   mov    <span class="nv">$0x1</span>,%bl
+
+   a:   59                      pop    %ecx
+   b:   31 d2                   xor    %edx,%edx
+   d:   b2 12                   mov    <span class="nv">$0x12</span>,%dl
+   f:   <span class="nb">cd </span>80                   int    <span class="nv">$0x80</span>
+  11:   31 c0                   xor    %eax,%eax
+  13:   b0 01                   mov    <span class="nv">$0x1</span>,%al
+  15:   31 db                   xor    %ebx,%ebx
+  17:   <span class="nb">cd </span>80                   int    <span class="nv">$0x80</span>
+
+00000019 &lt;tail&gt;:
+  19:   e8 e4 ff ff ff          call   2 &lt;head&gt;
+  1e:   48                      dec    %eax
+  1f:   65 6c                   gs insb <span class="o">(</span>%dx<span class="o">)</span>,%es:<span class="o">(</span>%edi<span class="o">)</span>
+  21:   6c                      insb   <span class="o">(</span>%dx<span class="o">)</span>,%es:<span class="o">(</span>%edi<span class="o">)</span>
+  22:   6f                      outsl  %ds:<span class="o">(</span>%esi<span class="o">)</span>,<span class="o">(</span>%dx<span class="o">)</span>
+  23:   20 53 68                and    %dl,0x68<span class="o">(</span>%ebx<span class="o">)</span>
+  26:   65 6c                   gs insb <span class="o">(</span>%dx<span class="o">)</span>,%es:<span class="o">(</span>%edi<span class="o">)</span>
+  28:   6c                      insb   <span class="o">(</span>%dx<span class="o">)</span>,%es:<span class="o">(</span>%edi<span class="o">)</span>
+  29:   63 6f 64                arpl   %bp,0x64<span class="o">(</span>%edi<span class="o">)</span>
+  2c:   65 72 21                gs jb  50 &lt;tail+0x37&gt;
+  2f:   0a                      .byte 0xa</code></pre></figure>
+
+<p>And we can drop that into a slightly modified C wrapper (we remove the arguments we passed to the previous iteration of this):</p>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c"><span class="cp">#include &lt;string.h&gt;
+#include &lt;sys/mman.h&gt;
+</span>
+<span class="kt">char</span> <span class="n">code</span><span class="p">[]</span> <span class="o">=</span> <span class="s">"</span><span class="se">\xeb\x17\x31\xc0\xb0\x04\x31\xdb\xb3\x01\x59\x31\xd2\xb2\x12\xcd\x80\x31\xc0\xb0\x01\x31\xdb\xcd\x80\xe8\xe4\xff\xff\xff\x48\x65\x6c\x6c\x6f\x20\x53\x68\x65\x6c\x6c\x63\x6f\x64\x65\x72\x21\x0a</span><span class="s">"</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="n">main</span><span class="p">(){</span>
+    <span class="kt">void</span> <span class="o">*</span> <span class="n">buf</span><span class="p">;</span>
+
+    <span class="c1">// mmap a executable memory block and copy code into it.
+</span>    <span class="n">buf</span> <span class="o">=</span> <span class="n">mmap</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">code</span><span class="p">),</span> <span class="n">PROT_EXEC</span> <span class="o">|</span> <span class="n">PROT_READ</span> <span class="o">|</span> <span class="n">PROT_WRITE</span><span class="p">,</span> <span class="n">MAP_ANONYMOUS</span> <span class="o">|</span> <span class="n">MAP_PRIVATE</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">memcpy</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span> <span class="n">code</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">code</span><span class="p">));</span>
+    
+    <span class="p">((</span><span class="kt">void</span> <span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="p">(</span><span class="kt">void</span><span class="p">))</span><span class="n">buf</span><span class="p">)();</span>
+
+    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>Which we can compile and run in a similar way:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="gp">$ </span>gcc shellcode-c-wrapper.c -m32
+<span class="gp">$ </span>./a.out
+Hello Shellcoder!</code></pre></figure>
+
+<p>Hope this was educational/helpful!</p>
+
+
+  </div>
+
+  
+</article>
+
+      </div>
+    </main>
+
+    <footer class="site-footer">
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">System E</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li>
+            
+              System E
+            
+            </li>
+            
+            <li><a href="mailto:everett@everettmaus.com">everett@everettmaus.com</a></li>
+            
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-2">
+        <ul class="social-media-list">
+          
+          <li>
+            <a href="https://github.com/evmaus"><span class="icon icon--github"><svg viewBox="0 0 16 16" width="16px" height="16px"><path fill="#828282" d="M7.999,0.431c-4.285,0-7.76,3.474-7.76,7.761 c0,3.428,2.223,6.337,5.307,7.363c0.388,0.071,0.53-0.168,0.53-0.374c0-0.184-0.007-0.672-0.01-1.32 c-2.159,0.469-2.614-1.04-2.614-1.04c-0.353-0.896-0.862-1.135-0.862-1.135c-0.705-0.481,0.053-0.472,0.053-0.472 c0.779,0.055,1.189,0.8,1.189,0.8c0.692,1.186,1.816,0.843,2.258,0.645c0.071-0.502,0.271-0.843,0.493-1.037 C4.86,11.425,3.049,10.76,3.049,7.786c0-0.847,0.302-1.54,0.799-2.082C3.768,5.507,3.501,4.718,3.924,3.65 c0,0,0.652-0.209,2.134,0.796C6.677,4.273,7.34,4.187,8,4.184c0.659,0.003,1.323,0.089,1.943,0.261 c1.482-1.004,2.132-0.796,2.132-0.796c0.423,1.068,0.157,1.857,0.077,2.054c0.497,0.542,0.798,1.235,0.798,2.082 c0,2.981-1.814,3.637-3.543,3.829c0.279,0.24,0.527,0.713,0.527,1.437c0,1.037-0.01,1.874-0.01,2.129 c0,0.208,0.14,0.449,0.534,0.373c3.081-1.028,5.302-3.935,5.302-7.362C15.76,3.906,12.285,0.431,7.999,0.431z"/></svg>
+</span><span class="username">evmaus</span></a>
+
+          </li>
+          
+
+          
+          <li>
+            <a href="https://twitter.com/everettmaus"><span class="icon icon--twitter"><svg viewBox="0 0 16 16" width="16px" height="16px"><path fill="#828282" d="M15.969,3.058c-0.586,0.26-1.217,0.436-1.878,0.515c0.675-0.405,1.194-1.045,1.438-1.809c-0.632,0.375-1.332,0.647-2.076,0.793c-0.596-0.636-1.446-1.033-2.387-1.033c-1.806,0-3.27,1.464-3.27,3.27 c0,0.256,0.029,0.506,0.085,0.745C5.163,5.404,2.753,4.102,1.14,2.124C0.859,2.607,0.698,3.168,0.698,3.767 c0,1.134,0.577,2.135,1.455,2.722C1.616,6.472,1.112,6.325,0.671,6.08c0,0.014,0,0.027,0,0.041c0,1.584,1.127,2.906,2.623,3.206 C3.02,9.402,2.731,9.442,2.433,9.442c-0.211,0-0.416-0.021-0.615-0.059c0.416,1.299,1.624,2.245,3.055,2.271 c-1.119,0.877-2.529,1.4-4.061,1.4c-0.264,0-0.524-0.015-0.78-0.046c1.447,0.928,3.166,1.469,5.013,1.469 c6.015,0,9.304-4.983,9.304-9.304c0-0.142-0.003-0.283-0.009-0.423C14.976,4.29,15.531,3.714,15.969,3.058z"/></svg>
+</span><span class="username">everettmaus</span></a>
+
+          </li>
+          
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-3">
+        <p>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
+</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+
+
+  </body>
+
+</html>

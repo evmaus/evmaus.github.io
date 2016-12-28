@@ -69,18 +69,18 @@
     <p>Hello World!</p>
 
 <p>This is, perhaps obviously, a starting post.  So I’ve opted to start with something reasonably fun:
-a breakdown of how to write &amp; test a piece of ‘hello world’ shellcode assembly targetting Linux.<br />
+a breakdown of how to write &amp; test a piece of ‘hello world’ shellcode assembly targeting Linux.<br />
 We’ll start with a simple assembly program which prints output using interrupts to trigger system calls, 
 move to compiling just part of that function, dumping it as hex, and calling it from C, and then use
-a couple of tricks to remove the nulls from it–which will allow it to be used as shellcode.  These tricks 
-are useful for ‘classic’ buffer overflow attacks (which I’ll likely dig into at some later date).</p>
+a couple of tricks to remove the nulls and parameters from it–which will allow it to be used as shellcode.
+These tricks are useful for ‘classic’ buffer overflow attacks (which I’ll likely dig into at some later date).</p>
 
 <p>I opted to go with x86-32 bit assembly (since it’s what I know well off the top of my head).  Perhaps someday I’ll
 revisit this post but use 64 bit assembly.</p>
 
 <p>The code samples here are going to be available on my github page <a href="https://github.com/evmaus/evmaus.github.io-snippets">here</a>.  If you want to follow along,
-you’ll need to install the GCC and GAS to compile the samples, and if you’re on a 64 bit x86 system configure your system
-for multilib.</p>
+you’ll need to install the GCC and GAS to compile the samples, and if you’re on a x86_64 system, you may need to configure 
+your system for multilib.</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c"># For multilib, since I wrote this on an x86_64 machine:</span>
 <span class="nv">$dpkg</span> --add-architecture i386
@@ -123,23 +123,24 @@ registers control what parameters are passed to the function (in order:  EBX, EC
 full list of syscalls is available in the <a href="https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_32.tbl">linux kernel</a>.  The parameters are documented in man pages,
 but they’re basically the standard POSIX calls–in general, you can access them via a man call like:</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$man</span> 2 write</code></pre></figure>
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="gp">$ </span>man 2 write</code></pre></figure>
 
 <p>You should be able to compile and run the above with:</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$gcc</span> basic-hello-world.s -m32 -o Hello-Reader
-<span class="nv">$.</span>/Hello-Reader
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="gp">$ </span>gcc basic-hello-world.s -m32 -o Hello-Reader
+<span class="gp">$ </span>./Hello-Reader
 Hello Reader!</code></pre></figure>
 
 <h2 id="calling-this-from-c">Calling this from C</h2>
 
 <p>The above program is compiled to a full executable–if you run “objdump -t Hello-Reader” you’ll get a whole bunch of symbols,
 and on my system it compiled down to a 4832 byte file.  If we’re going to do a classic buffer overflow attack, we’re likely 
-pushing our shellcode into input somewhere, and don’t need the full executable file to do that.</p>
+pushing our shellcode into input somewhere, and don’t need the full executable file to do that–just the instructions we’ll
+want to execute.</p>
 
-<p>So in order to just get down to the core of our assembly program, we’ll create two files–first, an assembly file containing
-the code we wish to execute, and second a C wrapper that contains the hexadecimal representation of just the assembly we’re
-calling into.</p>
+<p>So in order to just get down to the core of our assembly program and test it without having to actually inject it anywhere,
+we’ll create two files–first, an assembly file containing the code we wish to execute, and second a C wrapper that contains 
+the hexadecimal representation of just the assembly we’re calling into.</p>
 
 <p>First, the assembly function:  we’ll start with just a simple assembly function which wraps our syscall to
 “write” in a function that takes two arguments and passes them along.</p>
@@ -168,8 +169,8 @@ write_call:
 (with the –32 flag so that it’s 32 bit), and then we can dump the machine code of this function using objdump.  It 
 should be similar to:</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$as</span> asm-function.s -o asm-function.o --32
-<span class="nv">$objdump</span> -d asm-function.o
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="gp">$ </span>as asm-function.s -o asm-function.o --32
+<span class="gp">$ </span>objdump -d asm-function.o
 
 asm-function.o:     file format elf32-i386
 
@@ -213,8 +214,8 @@ populating an executable buffer with the hex, and calling the function with the 
 
 <p>This can be compiled with</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$gcc</span> asm-function-c-wrapper.c -m32 -o c-wrapper
-<span class="nv">$.</span>/c-wrapper
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="gp">$ </span>gcc asm-function-c-wrapper.c -m32 -o c-wrapper
+<span class="gp">$ </span>./c-wrapper
 Hello Reader!</code></pre></figure>
 
 <p>If you want to dig more into what this is doing, you can compile it with the -g flag and step through it with gdb.
@@ -280,8 +281,8 @@ tail:
 
 <p>As before, we can compile this and dump the hexadecimal:</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nv">$as</span> null-free-write.s --32 -o null-free-write.o
-<span class="nv">$objdump</span> -D null-free-write.o
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="gp">$ </span>as null-free-write.s --32 -o null-free-write.o
+<span class="gp">$ </span>objdump -D null-free-write.o
 
 null-free-write.o:     file format elf32-i386
 
@@ -338,7 +339,7 @@ Disassembly of section .text:
     <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
 <span class="p">}</span></code></pre></figure>
 
-<p>Which we can compile and run in a similar way:</p>
+<p>Which we can compile and run in a similar way, which should output the new greeting as expected:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="gp">$ </span>gcc shellcode-c-wrapper.c -m32
 <span class="gp">$ </span>./a.out

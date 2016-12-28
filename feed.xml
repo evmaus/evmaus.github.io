@@ -1,19 +1,19 @@
-<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2016-12-27T17:37:47-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2016-12-27T17:44:26-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
 </subtitle><entry><title type="html">Hello World!</title><link href="/x86/assembly/shellcode/2016/12/27/hello-world.html" rel="alternate" type="text/html" title="Hello World!" /><published>2016-12-27T00:00:00-08:00</published><updated>2016-12-27T00:00:00-08:00</updated><id>/x86/assembly/shellcode/2016/12/27/hello-world</id><content type="html" xml:base="/x86/assembly/shellcode/2016/12/27/hello-world.html">&lt;p&gt;Hello World!&lt;/p&gt;
 
 &lt;p&gt;This is, perhaps obviously, a starting post.  So I’ve opted to start with something reasonably fun:
-a breakdown of how to write &amp;amp; test a piece of ‘hello world’ shellcode assembly targetting Linux.&lt;br /&gt;
+a breakdown of how to write &amp;amp; test a piece of ‘hello world’ shellcode assembly targeting Linux.&lt;br /&gt;
 We’ll start with a simple assembly program which prints output using interrupts to trigger system calls, 
 move to compiling just part of that function, dumping it as hex, and calling it from C, and then use
-a couple of tricks to remove the nulls from it–which will allow it to be used as shellcode.  These tricks 
-are useful for ‘classic’ buffer overflow attacks (which I’ll likely dig into at some later date).&lt;/p&gt;
+a couple of tricks to remove the nulls and parameters from it–which will allow it to be used as shellcode.
+These tricks are useful for ‘classic’ buffer overflow attacks (which I’ll likely dig into at some later date).&lt;/p&gt;
 
 &lt;p&gt;I opted to go with x86-32 bit assembly (since it’s what I know well off the top of my head).  Perhaps someday I’ll
 revisit this post but use 64 bit assembly.&lt;/p&gt;
 
 &lt;p&gt;The code samples here are going to be available on my github page &lt;a href=&quot;https://github.com/evmaus/evmaus.github.io-snippets&quot;&gt;here&lt;/a&gt;.  If you want to follow along,
-you’ll need to install the GCC and GAS to compile the samples, and if you’re on a 64 bit x86 system configure your system
-for multilib.&lt;/p&gt;
+you’ll need to install the GCC and GAS to compile the samples, and if you’re on a x86_64 system, you may need to configure 
+your system for multilib.&lt;/p&gt;
 
 &lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;c&quot;&gt;# For multilib, since I wrote this on an x86_64 machine:&lt;/span&gt;
 &lt;span class=&quot;nv&quot;&gt;$dpkg&lt;/span&gt; --add-architecture i386
@@ -56,23 +56,24 @@ registers control what parameters are passed to the function (in order:  EBX, EC
 full list of syscalls is available in the &lt;a href=&quot;https://github.com/torvalds/linux/blob/v3.13/arch/x86/syscalls/syscall_32.tbl&quot;&gt;linux kernel&lt;/a&gt;.  The parameters are documented in man pages,
 but they’re basically the standard POSIX calls–in general, you can access them via a man call like:&lt;/p&gt;
 
-&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$man&lt;/span&gt; 2 write&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;man 2 write&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
 
 &lt;p&gt;You should be able to compile and run the above with:&lt;/p&gt;
 
-&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$gcc&lt;/span&gt; basic-hello-world.s -m32 -o Hello-Reader
-&lt;span class=&quot;nv&quot;&gt;$.&lt;/span&gt;/Hello-Reader
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;gcc basic-hello-world.s -m32 -o Hello-Reader
+&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;./Hello-Reader
 Hello Reader!&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
 
 &lt;h2 id=&quot;calling-this-from-c&quot;&gt;Calling this from C&lt;/h2&gt;
 
 &lt;p&gt;The above program is compiled to a full executable–if you run “objdump -t Hello-Reader” you’ll get a whole bunch of symbols,
 and on my system it compiled down to a 4832 byte file.  If we’re going to do a classic buffer overflow attack, we’re likely 
-pushing our shellcode into input somewhere, and don’t need the full executable file to do that.&lt;/p&gt;
+pushing our shellcode into input somewhere, and don’t need the full executable file to do that–just the instructions we’ll
+want to execute.&lt;/p&gt;
 
-&lt;p&gt;So in order to just get down to the core of our assembly program, we’ll create two files–first, an assembly file containing
-the code we wish to execute, and second a C wrapper that contains the hexadecimal representation of just the assembly we’re
-calling into.&lt;/p&gt;
+&lt;p&gt;So in order to just get down to the core of our assembly program and test it without having to actually inject it anywhere,
+we’ll create two files–first, an assembly file containing the code we wish to execute, and second a C wrapper that contains 
+the hexadecimal representation of just the assembly we’re calling into.&lt;/p&gt;
 
 &lt;p&gt;First, the assembly function:  we’ll start with just a simple assembly function which wraps our syscall to
 “write” in a function that takes two arguments and passes them along.&lt;/p&gt;
@@ -101,8 +102,8 @@ write_call:
 (with the –32 flag so that it’s 32 bit), and then we can dump the machine code of this function using objdump.  It 
 should be similar to:&lt;/p&gt;
 
-&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$as&lt;/span&gt; asm-function.s -o asm-function.o --32
-&lt;span class=&quot;nv&quot;&gt;$objdump&lt;/span&gt; -d asm-function.o
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;as asm-function.s -o asm-function.o --32
+&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;objdump -d asm-function.o
 
 asm-function.o:     file format elf32-i386
 
@@ -146,8 +147,8 @@ populating an executable buffer with the hex, and calling the function with the 
 
 &lt;p&gt;This can be compiled with&lt;/p&gt;
 
-&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$gcc&lt;/span&gt; asm-function-c-wrapper.c -m32 -o c-wrapper
-&lt;span class=&quot;nv&quot;&gt;$.&lt;/span&gt;/c-wrapper
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;gcc asm-function-c-wrapper.c -m32 -o c-wrapper
+&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;./c-wrapper
 Hello Reader!&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
 
 &lt;p&gt;If you want to dig more into what this is doing, you can compile it with the -g flag and step through it with gdb.
@@ -213,8 +214,8 @@ tail:
 
 &lt;p&gt;As before, we can compile this and dump the hexadecimal:&lt;/p&gt;
 
-&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nv&quot;&gt;$as&lt;/span&gt; null-free-write.s --32 -o null-free-write.o
-&lt;span class=&quot;nv&quot;&gt;$objdump&lt;/span&gt; -D null-free-write.o
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;as null-free-write.s --32 -o null-free-write.o
+&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;objdump -D null-free-write.o
 
 null-free-write.o:     file format elf32-i386
 
@@ -271,7 +272,7 @@ Disassembly of section .text:
     &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
 &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
 
-&lt;p&gt;Which we can compile and run in a similar way:&lt;/p&gt;
+&lt;p&gt;Which we can compile and run in a similar way, which should output the new greeting as expected:&lt;/p&gt;
 
 &lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;gcc shellcode-c-wrapper.c -m32
 &lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;./a.out

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2016-12-27T17:30:32-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2016-12-27T17:32:35-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
 </subtitle><entry><title type="html">Hello World!</title><link href="/x86/assembly/shellcode/2016/12/27/hello-world.html" rel="alternate" type="text/html" title="Hello World!" /><published>2016-12-27T00:00:00-08:00</published><updated>2016-12-27T00:00:00-08:00</updated><id>/x86/assembly/shellcode/2016/12/27/hello-world</id><content type="html" xml:base="/x86/assembly/shellcode/2016/12/27/hello-world.html">&lt;p&gt;Hello World!&lt;/p&gt;
 
 &lt;p&gt;This is, perhaps obviously, a starting post.  So I’ve opted to start with something reasonably fun:
@@ -11,7 +11,7 @@ are useful for ‘classic’ buffer overflow attacks (which I’ll likely dig in
 &lt;p&gt;I opted to go with x86-32 bit assembly (since it’s what I know well off the top of my head).  Perhaps someday I’ll
 revisit this post but use 64 bit assembly.&lt;/p&gt;
 
-&lt;p&gt;The code samples here are going to be available on my github page &lt;a href=&quot;https://github.com/evmaus&quot;&gt;here&lt;/a&gt;.  If you want to follow along,
+&lt;p&gt;The code samples here are going to be available on my github page &lt;a href=&quot;https://github.com/evmaus/evmaus.github.io-snippets&quot;&gt;here&lt;/a&gt;.  If you want to follow along,
 you’ll need to install the GCC and GAS to compile the samples, and if you’re on a 64 bit x86 system configure your system
 for multilib.&lt;/p&gt;
 

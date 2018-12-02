@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2018-12-02T15:31:12-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2018-12-02T15:50:28-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
 </subtitle><entry><title type="html">The Road To My First Conference Talk</title><link href="/blog/posts/2018/10/01/first-conference-talk-process.html" rel="alternate" type="text/html" title="The Road To My First Conference Talk" /><published>2018-10-01T13:00:00-07:00</published><updated>2018-10-01T13:00:00-07:00</updated><id>/blog/posts/2018/10/01/first-conference-talk-process</id><content type="html" xml:base="/blog/posts/2018/10/01/first-conference-talk-process.html">&lt;p&gt;So, it’s been a while.  My idea of blogging regularly did not necessarily interact well with reality.  However,
 I’ve got some time now, so I figured I’d chat about a talk I gave at BlueHat 2018–what went into it and my approach for preparing for my first conference talk.&lt;/p&gt;
 
@@ -19,8 +19,9 @@ sent out the acceptance emails a day after the schedule was posted.  Fun fact:  
 little distracting.&lt;/p&gt;
 
 &lt;p&gt;Now I really had to actually put together a talk.  I’d done a good bit of public speaking in college (I was part of the Washington Literary Society
-and Debating Union at UVa), and done part of an internal conference for Microsoft developers, but I hadn’t ever put together a full 50 minute talk–just a shorter 10 minute section of a 50 minute talk.  That meant I needed CONTENT, and lots of it.  Fortunately, I’d been working in this space
-for a while–so I started by writing out all of my thoughts on it.  Then I went and read a bunch of papers on the topic, and summarized each of them.  The read/summarize cycle was invaluable, as it helped me put into concrete terms some ideas I had phrased in a wishy-washy way.&lt;/p&gt;
+and Debating Union at UVa), and done part of an internal conference for Microsoft developers, but I hadn’t ever put together a full 50 minute talk–just a shorter 10 minute section of a 50 minute talk.  That meant I needed CONTENT, and lots of it.&lt;/p&gt;
+
+&lt;p&gt;Fortunately, I’d been working in this space for a while–so I started by writing out all of my thoughts on it.  Then I went and read a bunch of papers on the topic, and summarized each of them.  The read/summarize cycle was invaluable, as it helped me put into concrete terms some ideas I had phrased in a wishy-washy way.&lt;/p&gt;
 
 &lt;p&gt;Once I had the content, I needed to construct a talk out of it.  This was far harder than I expected, and I’m glad I left a lot of time for it–knowing
 what you want to say and organizing it coherently are two very different things.&lt;/p&gt;
@@ -36,8 +37,8 @@ on the talk (which was invaluable).  Getting outside perspective improved the ta
 
 &lt;ol&gt;
   &lt;li&gt;Although it was a lot of work, the conference talk was definitely worth doing.&lt;/li&gt;
-  &lt;li&gt;Just submit if you have an idea, the talk itself will follow.&lt;/li&gt;
-  &lt;li&gt;Go deep first, then generalize.&lt;/li&gt;
+  &lt;li&gt;Just submit if you have an idea, the talk itself can follow.&lt;/li&gt;
+  &lt;li&gt;Go deep first, then generalize.  This helps you get specific details, which will help your talk, and you can easily structure your talk around them.&lt;/li&gt;
   &lt;li&gt;Get a second pair of eyes on the talk content, if you can–that will help polish the talk.&lt;/li&gt;
 &lt;/ol&gt;
 

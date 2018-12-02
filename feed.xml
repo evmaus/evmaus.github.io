@@ -1,5 +1,48 @@
-<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2016-12-30T13:29:35-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
-</subtitle><entry><title type="html">Hello World!</title><link href="/blog/posts/2016/12/27/hello-world.html" rel="alternate" type="text/html" title="Hello World!" /><published>2016-12-27T00:00:00-08:00</published><updated>2016-12-27T00:00:00-08:00</updated><id>/blog/posts/2016/12/27/hello-world</id><content type="html" xml:base="/blog/posts/2016/12/27/hello-world.html">&lt;p&gt;Hello World!&lt;/p&gt;
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.3.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2018-12-02T15:31:12-08:00</updated><id>//</id><title type="html">System E</title><subtitle>Everett Maus is a software engineer currently working at Microsoft. See the About page for more information, including copyright details.
+</subtitle><entry><title type="html">The Road To My First Conference Talk</title><link href="/blog/posts/2018/10/01/first-conference-talk-process.html" rel="alternate" type="text/html" title="The Road To My First Conference Talk" /><published>2018-10-01T13:00:00-07:00</published><updated>2018-10-01T13:00:00-07:00</updated><id>/blog/posts/2018/10/01/first-conference-talk-process</id><content type="html" xml:base="/blog/posts/2018/10/01/first-conference-talk-process.html">&lt;p&gt;So, it’s been a while.  My idea of blogging regularly did not necessarily interact well with reality.  However,
+I’ve got some time now, so I figured I’d chat about a talk I gave at BlueHat 2018–what went into it and my approach for preparing for my first conference talk.&lt;/p&gt;
+
+&lt;p&gt;I spend a lot of time in my last role thinking about how to make static analysis as painless as possible for the average developer.  There’s
+a ton of evidence that static analysis tools find valuable bugs, but there’s just as much evidence that the current status
+quo for their usage is “Many developers don’t use them, and those that do don’t necessarily like them.”&lt;/p&gt;
+
+&lt;p&gt;I figured something I already spend a lot of time thinking about would make a good conference topic, so I put together a proposal.  Now, I hadn’t
+done this before, but something I quickly figured out was that a proposal is not a full conference talk, it’s the outline for a full conference talk,
+at best.&lt;/p&gt;
+
+&lt;p&gt;Mine went something like:  “Security tools are important!  I’ll talk about what to do when you write them!”, but with a bit more formality.  I didn’t actually have much beyond that–I was confident in my ability to put together a talk on the subject.&lt;/p&gt;
+
+&lt;p&gt;I submitted well before the deadline–I was excited about this, and I didn’t want to forget to do it.&lt;/p&gt;
+
+&lt;p&gt;A few weeks after the deadline, I found out that I was speaking at BlueHat!  I actually found out by looking at the conference site, because they
+sent out the acceptance emails a day after the schedule was posted.  Fun fact:  your coworkers find you shouting “YESSSSSSS” in an open space office a
+little distracting.&lt;/p&gt;
+
+&lt;p&gt;Now I really had to actually put together a talk.  I’d done a good bit of public speaking in college (I was part of the Washington Literary Society
+and Debating Union at UVa), and done part of an internal conference for Microsoft developers, but I hadn’t ever put together a full 50 minute talk–just a shorter 10 minute section of a 50 minute talk.  That meant I needed CONTENT, and lots of it.  Fortunately, I’d been working in this space
+for a while–so I started by writing out all of my thoughts on it.  Then I went and read a bunch of papers on the topic, and summarized each of them.  The read/summarize cycle was invaluable, as it helped me put into concrete terms some ideas I had phrased in a wishy-washy way.&lt;/p&gt;
+
+&lt;p&gt;Once I had the content, I needed to construct a talk out of it.  This was far harder than I expected, and I’m glad I left a lot of time for it–knowing
+what you want to say and organizing it coherently are two very different things.&lt;/p&gt;
+
+&lt;p&gt;I used a few tricks to organize things–first, I listed out every point I thought I wanted to make on a sheet of paper.  Then I went through those points and tried to connect them using shared themes–this gave me a high level talk plan.  This is a strategy I learned in college, and its served me well since:  you start by going deep into the subject, and then you zoom back out to get the intellectual “lay of the land”.  One downside of this, though, is that you aren’t quite sure how your talk is going to organize itself until you finish the process–I’m not sure I’d recommend it for persuasive speaking.&lt;/p&gt;
+
+&lt;p&gt;I then needed to cut some content–my talk was, I estimated, about an hour and a half.  I got that number by multiplying the number of points by about how long I thought it’d take to make them–a slide takes me about a minute and a half to three minutes, and I had too many of them. Fortunately, perhaps, this wasn’t too hard–some of the content was simply less compelling (or was primarily of interest to Microsoft developers).&lt;/p&gt;
+
+&lt;p&gt;Lastly, I did a few dry runs on my own to get a feel for how the presentation was going to go, and presented it to my team at Microsoft to get feedback
+on the talk (which was invaluable).  Getting outside perspective improved the talk’s content, and I’d highly recommend it to anyone who’s giving a talk.&lt;/p&gt;
+
+&lt;p&gt;My big takeaways from the experience were:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Although it was a lot of work, the conference talk was definitely worth doing.&lt;/li&gt;
+  &lt;li&gt;Just submit if you have an idea, the talk itself will follow.&lt;/li&gt;
+  &lt;li&gt;Go deep first, then generalize.&lt;/li&gt;
+  &lt;li&gt;Get a second pair of eyes on the talk content, if you can–that will help polish the talk.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;I’ll cover the actual content of the talk in another post.  The talk itself is available &lt;a href=&quot;https://www.youtube.com/watch?v=XwHFiB2w5dw&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;</content><summary type="html">So, it’s been a while.  My idea of blogging regularly did not necessarily interact well with reality.  However,
+I’ve got some time now, so I figured I’d chat about a talk I gave at BlueHat 2018–what went into it and my approach for preparing for my first conference talk.</summary></entry><entry><title type="html">Hello World!</title><link href="/blog/posts/2016/12/27/hello-world.html" rel="alternate" type="text/html" title="Hello World!" /><published>2016-12-27T00:00:00-08:00</published><updated>2016-12-27T00:00:00-08:00</updated><id>/blog/posts/2016/12/27/hello-world</id><content type="html" xml:base="/blog/posts/2016/12/27/hello-world.html">&lt;p&gt;Hello World!&lt;/p&gt;
 
 &lt;p&gt;This is, perhaps obviously, a starting post.  So I’ve opted to start with something reasonably fun:
 a breakdown of how to write &amp;amp; test a piece of ‘hello world’ shellcode assembly targeting Linux.&lt;br /&gt;
